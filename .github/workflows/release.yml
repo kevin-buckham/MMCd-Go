@@ -86,17 +86,23 @@ jobs:
         run: npm install
         working-directory: frontend
 
+      - name: Detect webkit2gtk version (Linux only)
+        if: runner.os == 'Linux'
+        id: webkit
+        shell: bash
+        run: |
+          if pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+            echo "tags=-tags webkit2_41" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build desktop app (stripped)
+        shell: bash
         run: |
           PKG=github.com/kbuckham/mmcd/internal/version
           HASH=$(git rev-parse --short HEAD)
           TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
           FLAGS="-s -w -X ${PKG}.GitHash=${HASH} -X ${PKG}.BuildTime=${TIME}"
-          TAGS=""
-          if pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
-            TAGS="-tags webkit2_41"
-          fi
-          wails build -platform ${{ matrix.platform }} -ldflags "${FLAGS}" ${TAGS}
+          wails build -platform ${{ matrix.platform }} -ldflags "${FLAGS}" ${{ steps.webkit.outputs.tags }}
 
       - name: Package Linux binary
         if: runner.os == 'Linux'
