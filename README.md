@@ -32,31 +32,79 @@ A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **head
 - **Log review** — Display saved logs in the terminal
 - **Cross-platform** — Runs on Raspberry Pi, SSH sessions, or anywhere without a display
 
-## Quick Start
+## Screenshots
+
+### Dashboard — Live Sensor Tiles
+<p align="center">
+  <img src="icons/screenshot-dashboard.png" alt="MMCD Dashboard — live sensor tiles" width="800">
+</p>
+
+### Graph — Scrollable History with Crosshair
+<p align="center">
+  <img src="icons/screenshot-graph.png" alt="MMCD Graph — real-time scrollable graph with pinned crosshair" width="800">
+</p>
+
+## Download
+
+Pre-built binaries are available on the [Releases](https://github.com/kevin-buckham/MMCd-Go/releases) page — no development tools required.
+
+| File | Platform | Description |
+|------|----------|-------------|
+| `mmcd-desktop-darwin-universal.zip` | macOS (Intel + Apple Silicon) | Desktop app — unzip and run `mmcd.app` |
+| `mmcd-desktop-linux-amd64.tar.gz` | Linux x86_64 | Desktop app — extract and run `./mmcd` |
+| `mmcd-desktop-windows-amd64.exe` | Windows x86_64 | Desktop app — run directly |
+| `mmcd-cli-*` | All platforms | Headless CLI (no GUI needed) |
+
+## Quick Start (Developers)
 
 ### Prerequisites
 
 - **[Go 1.22+](https://go.dev/dl/)**
 - **[Node.js 18+](https://nodejs.org/)** (for frontend build)
-- **[Wails CLI v2](https://wails.io/docs/gettingstarted/installation)** (for desktop GUI)
+- **[Wails CLI v2](https://wails.io/docs/gettingstarted/installation)** (for desktop GUI — installed automatically by `make setup`)
 
-Install the Wails CLI:
+#### Linux System Libraries
+
+Wails requires GTK3 and WebKit2GTK on Linux. Install them for your distro:
 
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
+# Ubuntu / Debian
+sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev
+
+# Fedora
+sudo dnf install gtk3-devel webkit2gtk4.0-devel
+
+# Arch
+sudo pacman -S gtk3 webkit2gtk
 ```
 
-### Build the Desktop App
+#### macOS
+
+No extra system libraries needed — Wails uses the native WebView.
+
+### Setup (New Machine)
 
 ```bash
 # Clone the repo
 git clone https://github.com/kevin-buckham/MMCd-Go.git
 cd MMCd-Go
 
-# Install frontend dependencies
-make install
+# One command: checks Go, Node, Linux libs, installs Wails CLI, npm install, go mod tidy
+make setup
+```
 
-# Build the app (produces build/bin/mmcd.app on macOS)
+`make setup` will:
+1. Verify Go and Node.js are installed
+2. Check for required Linux system libraries (on Linux)
+3. Install the Wails CLI if it's not already present
+4. Run `npm install` and `go mod tidy`
+
+You can also run `make check` at any time to verify all prerequisites without installing anything.
+
+### Build the Desktop App
+
+```bash
+# Build the app (produces build/bin/mmcd on Linux, build/bin/mmcd.app on macOS)
 make build
 ```
 

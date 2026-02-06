@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── CLI binaries (cross-compiled from Linux) ──────────────────────
+  build-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build CLI for all platforms (stripped)
+        run: |
+          PKG=github.com/kbuckham/mmcd/internal/version
+          HASH=$(git rev-parse --short HEAD)
+          TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          FLAGS="-s -w -X '${PKG}.GitHash=${HASH}' -X '${PKG}.BuildTime=${TIME}'"
+          GOOS=linux   GOARCH=amd64 go build -tags cli -ldflags "${FLAGS}" -o bin/mmcd-cli-linux-amd64 .
+          GOOS=linux   GOARCH=arm64 go build -tags cli -ldflags "${FLAGS}" -o bin/mmcd-cli-linux-arm64 .
+          GOOS=darwin  GOARCH=arm64 go build -tags cli -ldflags "${FLAGS}" -o bin/mmcd-cli-darwin-arm64 .
+          GOOS=darwin  GOARCH=amd64 go build -tags cli -ldflags "${FLAGS}" -o bin/mmcd-cli-darwin-amd64 .
+          GOOS=windows GOARCH=amd64 go build -tags cli -ldflags "${FLAGS}" -o bin/mmcd-cli-windows-amd64.exe .
+
+      - name: UPX compress Linux binaries
+        run: |
+          sudo apt-get install -y upx-ucl || sudo apt-get install -y upx
+          upx --best bin/mmcd-cli-linux-amd64
+          upx --best bin/mmcd-cli-linux-arm64
+
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-binaries
+          path: bin/
+
+  # ── Desktop app (per-platform native builds) ──────────────────────
+  build-desktop:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            artifact: mmcd
+          - os: macos-latest
+            platform: darwin/universal
+            artifact: mmcd.app
+          - os: windows-latest
+            platform: windows/amd64
+            artifact: mmcd.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: frontend
+
+      - name: Build desktop app (stripped)
+        run: |
+          PKG=github.com/kbuckham/mmcd/internal/version
+          HASH=$(git rev-parse --short HEAD)
+          TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          FLAGS="-s -w -X '${PKG}.GitHash=${HASH}' -X '${PKG}.BuildTime=${TIME}'"
+          wails build -platform ${{ matrix.platform }} -ldflags "${FLAGS}"
+
+      - name: Package Linux binary
+        if: runner.os == 'Linux'
+        run: |
+          cd build/bin
+          tar czf mmcd-desktop-linux-amd64.tar.gz mmcd
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        run: |
+          cd build/bin
+          zip -r mmcd-desktop-darwin-universal.zip mmcd.app
+
+      - name: Upload desktop artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: build/bin/mmcd-desktop-linux-amd64.tar.gz
+
+      - name: Upload desktop artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: build/bin/mmcd-desktop-darwin-universal.zip
+
+      - name: Upload desktop artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: build/bin/mmcd.exe
+
+  # ── Create GitHub Release ─────────────────────────────────────────
+  release:
+    needs: [build-cli, build-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          # CLI binaries
+          cp release-assets/cli-binaries/* release/
+          # Desktop packages
+          cp release-assets/desktop-linux/* release/
+          cp release-assets/desktop-macos/* release/
+          cp release-assets/desktop-windows/mmcd.exe release/mmcd-desktop-windows-amd64.exe
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*
