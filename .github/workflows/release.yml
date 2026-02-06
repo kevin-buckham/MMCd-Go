@@ -90,9 +90,13 @@ jobs:
         run: |
           PKG=github.com/kbuckham/mmcd/internal/version
           HASH=$(git rev-parse --short HEAD)
-          TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          FLAGS="-s -w -X '${PKG}.GitHash=${HASH}' -X '${PKG}.BuildTime=${TIME}'"
-          wails build -platform ${{ matrix.platform }} -ldflags "${FLAGS}"
+          TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          FLAGS="-s -w -X ${PKG}.GitHash=${HASH} -X ${PKG}.BuildTime=${TIME}"
+          TAGS=""
+          if pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+            TAGS="-tags webkit2_41"
+          fi
+          wails build -platform ${{ matrix.platform }} -ldflags "${FLAGS}" ${TAGS}
 
       - name: Package Linux binary
         if: runner.os == 'Linux'

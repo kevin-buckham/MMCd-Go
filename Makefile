@@ -9,6 +9,9 @@ GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -s -w -X $(VERSION_PKG).GitHash=$(GIT_HASH) -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
 
+# Auto-detect webkit2gtk-4.1 (Ubuntu 24.04+) and pass build tag to Wails
+WAILS_TAGS := $(shell pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-tags webkit2_41')
+
 # ── Prerequisite checks ─────────────────────────────────────────────
 
 check-go:
@@ -88,7 +91,7 @@ install:
 
 # Build the full Wails desktop app
 build: check-wails check-linux-deps frontend
-	wails build
+	wails build -ldflags '$(LDFLAGS)' $(WAILS_TAGS)
 
 # Build and run the desktop app
 run: build
@@ -101,7 +104,7 @@ run: build
 
 # Run in Wails dev mode (hot reload)
 dev: check-wails check-linux-deps
-	wails dev
+	wails dev $(WAILS_TAGS)
 
 # Build just the CLI (no frontend/Wails dependency)
 cli:
@@ -150,13 +153,13 @@ release-desktop: check-wails frontend
 	@echo "Building desktop app for $$(uname)..."
 	@case "$$(uname)" in \
 	Darwin) \
-		wails build -platform darwin/universal -ldflags '$(LDFLAGS)'; \
+		wails build -platform darwin/universal -ldflags '$(LDFLAGS)' $(WAILS_TAGS); \
 		;; \
 	Linux) \
-		wails build -platform linux/amd64 -ldflags '$(LDFLAGS)'; \
+		wails build -platform linux/amd64 -ldflags '$(LDFLAGS)' $(WAILS_TAGS); \
 		;; \
 	MINGW*|MSYS*|CYGWIN*) \
-		wails build -platform windows/amd64 -ldflags '$(LDFLAGS)'; \
+		wails build -platform windows/amd64 -ldflags '$(LDFLAGS)' $(WAILS_TAGS); \
 		;; \
 	*) \
 		echo "ERROR: Unsupported platform: $$(uname)"; \
