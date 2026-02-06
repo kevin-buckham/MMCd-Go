@@ -68,11 +68,14 @@ Pre-built binaries are available on the [Releases](https://github.com/kevin-buck
 Wails requires GTK3 and WebKit2GTK on Linux. Install them for your distro:
 
 ```bash
-# Ubuntu / Debian
+# Ubuntu 24.04+ / Debian 13+
+sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
+
+# Ubuntu 22.04 / Debian 12
 sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev
 
 # Fedora
-sudo dnf install gtk3-devel webkit2gtk4.0-devel
+sudo dnf install gtk3-devel webkit2gtk4.1-devel
 
 # Arch
 sudo pacman -S gtk3 webkit2gtk

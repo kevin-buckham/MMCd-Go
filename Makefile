@@ -40,15 +40,18 @@ check-linux-deps:
 	@if [ "$$(uname)" = "Linux" ]; then \
 		MISSING=""; \
 		pkg-config --exists gtk+-3.0 2>/dev/null || MISSING="$$MISSING libgtk-3-dev"; \
-		pkg-config --exists webkit2gtk-4.0 2>/dev/null || MISSING="$$MISSING libwebkit2gtk-4.0-dev"; \
+		pkg-config --exists webkit2gtk-4.1 2>/dev/null || pkg-config --exists webkit2gtk-4.0 2>/dev/null || MISSING="$$MISSING libwebkit2gtk-4.1-dev"; \
 		if [ -n "$$MISSING" ]; then \
 			echo "ERROR: Missing Linux system libraries:$$MISSING"; \
 			echo ""; \
-			echo "  Ubuntu/Debian:"; \
+			echo "  Ubuntu 24.04+ / Debian 13+:"; \
+			echo "    sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev"; \
+			echo ""; \
+			echo "  Ubuntu 22.04 / Debian 12:"; \
 			echo "    sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev"; \
 			echo ""; \
 			echo "  Fedora:"; \
-			echo "    sudo dnf install gtk3-devel webkit2gtk4.0-devel"; \
+			echo "    sudo dnf install gtk3-devel webkit2gtk4.1-devel"; \
 			echo ""; \
 			echo "  Arch:"; \
 			echo "    sudo pacman -S gtk3 webkit2gtk"; \
