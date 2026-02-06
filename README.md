@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/icon.png" alt="MMCD Datalogger" width="180">
+</p>
+
 # MMCD Datalogger
 
 Cross-platform diagnostic and datalogging tool for pre-OBDII (1990–1994) Mitsubishi vehicles — Eclipse, Eagle Talon, Plymouth Laser, Galant (4G63).
