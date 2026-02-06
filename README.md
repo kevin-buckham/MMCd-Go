@@ -8,6 +8,8 @@ Cross-platform diagnostic and datalogging tool for pre-OBDII (1990–1994) Mitsu
 
 A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **headless CLI**.
 
+> **⚠️ Pre-release (v0.3.x)** — This version has not yet been tested on a live vehicle. It includes a built-in demo simulator and can load recorded logs (including classic PalmOS MMCd `.pdb` files) for full UI and workflow testing. Once validated on-vehicle, it will be promoted to **v1.0.0**.
+
 ## Features
 
 ### Desktop GUI
@@ -47,6 +49,8 @@ A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **head
 ## Download
 
 Pre-built binaries are available on the [Releases](https://github.com/kevin-buckham/MMCd-Go/releases) page — no development tools required.
+
+You don't need a vehicle or hardware to explore the app — use **Demo mode** for a simulated ECU, or **load a recording** (CSV, `.mmcd`, or PalmOS `.pdb`) to review real data.
 
 | File | Platform | Description |
 |------|----------|-------------|
