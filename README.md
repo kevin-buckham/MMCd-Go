@@ -1,20 +1,98 @@
 # MMCD Datalogger
 
-Cross-platform diagnostic and datalogging tool for pre-OBDII (1990-1994) Mitsubishi vehicles — Eclipse, Eagle Talon, Plymouth Laser, Galant (4G63).
+Cross-platform diagnostic and datalogging tool for pre-OBDII (1990–1994) Mitsubishi vehicles — Eclipse, Eagle Talon, Plymouth Laser, Galant (4G63).
 
-Rebuilt from the classic [MMCd PalmOS datalogger](https://mmcdlogger.sourceforge.net/) as a modern Go application with both a **desktop GUI** (Wails v2 + Svelte) and a **headless CLI**.
+A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **headless CLI**.
 
 ## Features
 
-- **Live datalogging** — Poll up to 22 ECU sensors in real-time
-- **CSV export** — Timestamped logs with human-readable converted values
-- **Real-time graphs** — Scrolling time-series charts of selected sensors
+### Desktop GUI
+- **Three data source modes** — Live ECU, Demo Simulator, or Load Log File
+- **Real-time dashboard** — Live sensor tiles for all 22 channels
+- **Scrollable graph** — 30,000-sample deep history buffer with viewport scrolling
+- **Sample-pinned crosshair** — Click to pin, arrow keys to step sample-by-sample, Escape to unpin
+- **Elapsed time display** — Time shown on X axis and in crosshair readout panel
+- **Draggable scrollbar** — Click, drag, or mouse wheel (vertical + horizontal) to navigate
+- **Shared history** — Switch between Dashboard and Graph without losing data
+- **Log file viewer** — Load and review CSV, .mmcd, or PalmOS PDB files directly in the graph
 - **DTC read/erase** — Read active and stored diagnostic trouble codes
-- **Actuator tests** — Fuel pump, purge, EGR, injector disable
-- **Cross-platform** — Windows, macOS, Linux (single binary ~10-15MB)
-- **Headless CLI** — For Raspberry Pi, SSH, or scripted logging
+- **Actuator tests** — Fuel pump, purge solenoid, EGR, injector disable
+- **CSV recording** — Record live data to timestamped CSV while monitoring
+- **Demo mode** — Built-in ECU simulator with realistic driving scenarios (idle → accel → cruise → decel) for UI testing without hardware
 
-## Hardware Requirements
+### Headless CLI
+- **Datalogging** — Log sensors to CSV with live terminal display
+- **DTC diagnostics** — Read/erase trouble codes from the command line
+- **Actuator testing** — Trigger solenoid tests over serial
+- **Log import** — Convert PalmOS PDB files to CSV or native binary format
+- **Log review** — Display saved logs in the terminal
+- **Cross-platform** — Runs on Raspberry Pi, SSH sessions, or anywhere without a display
+
+## Quick Start
+
+### Prerequisites
+
+- **[Go 1.22+](https://go.dev/dl/)**
+- **[Node.js 18+](https://nodejs.org/)** (for frontend build)
+- **[Wails CLI v2](https://wails.io/docs/gettingstarted/installation)** (for desktop GUI)
+
+Install the Wails CLI:
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
+
+### Build the Desktop App
+
+```bash
+# Clone the repo
+git clone https://github.com/kevin-buckham/MMCd-Go.git
+cd MMCd-Go
+
+# Install frontend dependencies
+make install
+
+# Build the app (produces build/bin/mmcd.app on macOS)
+make build
+```
+
+### Run the Desktop App
+
+```bash
+# macOS
+open build/bin/mmcd.app
+
+# Linux / Windows
+./build/bin/mmcd
+```
+
+On launch you'll see the data source selector in the header:
+- **Live ECU** — Select your serial port and connect to a real ECU
+- **Demo** — Start the built-in simulator (no hardware needed)
+- **Load File** — Open a CSV, .mmcd, or PDB log file for review
+
+### Build CLI Only (no Wails/frontend needed)
+
+```bash
+make cli
+# Binary at bin/mmcd
+```
+
+### Development Mode (hot reload)
+
+```bash
+make dev
+```
+
+This runs `wails dev` which starts the Go backend and Svelte frontend with hot reload — changes to `.svelte` files update instantly in the app window.
+
+### Run Tests
+
+```bash
+make test
+```
+
+## Hardware
 
 You need a **USB-to-TTL serial adapter** (FTDI FT232, CH340, CP2102, etc.) and a **1N4148 diode** (or Schottky equivalent). No MAX232 level shifter is needed — the FTDI connects directly to the ECU's ALDL connector at TTL levels.
 
@@ -31,9 +109,9 @@ You need a **USB-to-TTL serial adapter** (FTDI FT232, CH340, CP2102, etc.) and a
    └── Pin 1: Serial data (bidirectional)
 ```
 
-### The "Universal" Cable Schematic
+### Cable Schematic
 
-This design works with MMCd, TunerPro, and EvoScan. The data line (Pin 1) is **bidirectional** — the ECU transmits and receives on the same wire. A **diode on the TX line** prevents the adapter's transmit signal from fighting the ECU's responses.
+This "universal" cable design works with MMCd, TunerPro, and EvoScan. The data line (Pin 1) is **bidirectional** — the ECU transmits and receives on the same wire. A **diode on the TX line** prevents the adapter's transmit signal from fighting the ECU's responses.
 
 ```
 FTDI/USB-TTL Adapter                           ALDL Connector
@@ -51,106 +129,69 @@ GND (Black) ──────────────────────�
                     Car Pin 10 ──── Car Pin 12 (jumper to enable diag mode)
 ```
 
-**Wire color reference** (standard FTDI pinout):
-- **RX** (Yellow or White) → directly to Car Pin 1
-- **TX** (Green) → through diode to Car Pin 1
-- **GND** (Black) → Car Pin 12
-
-### Diode Details
-
-The diode on TX ensures the adapter only drives the line low and doesn't hold it high between bytes, which would block the ECU's open-collector responses.
-
-- **1N4148** (silicon): Forward drop ~0.7V. For 5V TTL, Logic Low threshold is 0.8V, so 0.7V is technically safe. Works for 99% of setups.
-- **BAT85 or 1N5817** (Schottky): Forward drop ~0.2–0.3V. Gives a cleaner, more solid Logic Low with extra margin. **Use this if you have one.**
-
-**Diode orientation:**
-- **Stripe (cathode)** → towards FTDI adapter
-- **Non-stripe (anode)** → towards car
-
-### Connection Summary
-
 | FTDI Pin | Wire Color | Connects To | Notes |
 |----------|------------|-------------|-------|
 | RX | Yellow/White | Car Pin 1 | Direct connection |
 | TX | Green | Car Pin 1 | **Through diode** (anode→car, cathode→FTDI) |
 | GND | Black | Car Pin 12 | Ground |
-| — | — | Car Pin 10→12 | Jumper/bridge to enable diagnostic mode |
+| — | — | Car Pin 10→12 | Jumper to enable diagnostic mode |
+
+### Diode Details
+
+The diode on TX ensures the adapter only drives the line low and doesn't hold it high between bytes, which would block the ECU's open-collector responses.
+
+- **1N4148** (silicon): Forward drop ~0.7V. Works for 99% of setups.
+- **BAT85 or 1N5817** (Schottky): Forward drop ~0.2–0.3V. Cleaner logic low with extra margin. **Use this if you have one.**
+
+**Orientation:** Stripe (cathode) → towards FTDI adapter. Non-stripe (anode) → towards car.
 
 **Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control.
 
-See the [original documentation](https://mmcdlogger.sourceforge.net/) for additional reference.
-
-## Installation
-
-### Prerequisites
-
-- [Go 1.22+](https://go.dev/dl/)
-- [Wails v2](https://wails.io/docs/gettingstarted/installation) (for desktop GUI)
-- [Node.js 18+](https://nodejs.org/) (for frontend build)
-
-### Build
-
-```bash
-# Install dependencies
-make install
-
-# Build desktop app
-make build
-
-# Or build CLI only (no Wails/frontend needed)
-make cli
-```
-
-## Usage
-
-### Desktop GUI
-
-```bash
-# Launch the desktop app
-./mmcd
-```
-
-### CLI Commands
+## CLI Usage
 
 ```bash
 # List available sensors
 mmcd sensors
 
+# Show version and about info
+mmcd about
+mmcd --version
+
 # Start datalogging with live terminal display
-mmcd log --port /dev/ttyUSB0 --sensors RPM,TPS,COOL,TIMA --output log.csv --display
+mmcd log -p /dev/ttyUSB0 --sensors RPM,TPS,COOL,TIMA --output log.csv --display
 
 # Log all sensors
-mmcd log --port /dev/ttyUSB0 --sensors all --output log.csv
+mmcd log -p /dev/ttyUSB0 --sensors all --output log.csv
 
 # Read diagnostic trouble codes
-mmcd dtc --port /dev/ttyUSB0
+mmcd dtc -p /dev/ttyUSB0
 
 # Read and erase DTCs
-mmcd dtc --port /dev/ttyUSB0 --erase
+mmcd dtc -p /dev/ttyUSB0 --erase
 
 # Run actuator test
-mmcd test --port /dev/ttyUSB0 --command fuel-pump
+mmcd test -p /dev/ttyUSB0 --command fuel-pump
 
 # Review a saved log
 mmcd review --file log.csv
 
-# Import an old MMCd PalmOS PDB log file to CSV
+# Import PalmOS PDB log to CSV
 mmcd import --file 2003-01-17_First_run.PDB
 
-# Import to native binary format (for replay)
+# Import to native binary format
 mmcd import --file 2003-02-01_YEMELYA.PDB --format mmcd
 
 # Import with imperial units
 mmcd import --file log.PDB --units imperial
 ```
 
-### Common Options
+### Common Flags
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--port, -p` | Serial port | (required) |
+| `--port, -p` | Serial port (e.g., `/dev/ttyUSB0`, `COM3`) | (required) |
 | `--baud, -b` | Baud rate | 1953 |
-| `--units, -u` | Unit system: metric, imperial, raw | metric |
+| `--units, -u` | Unit system: `metric`, `imperial`, `raw` | `metric` |
 
 ## Supported Sensors
 
@@ -182,21 +223,70 @@ mmcd import --file log.PDB --units imperial
 ## Log Formats
 
 ### CSV (default)
-Human-readable timestamped log with both converted values and raw bytes. Each sensor gets two columns: `SLUG` (formatted value) and `SLUG_raw` (0-255). Created by `mmcd log --output file.csv` or `mmcd import --format csv`.
+Human-readable timestamped log with both converted values and raw bytes. Each sensor gets two columns: `SLUG` (formatted value) and `SLUG_raw` (0–255). Created by `mmcd log` or `mmcd import --format csv`.
 
 ### .mmcd (native binary)
-Compact binary format for efficient storage and replay. 48 bytes per sample (8-byte nanosecond timestamp + 4-byte dataPresent bitmask + 32-byte raw data + 4 bytes padding). Created by `mmcd import --format mmcd`. Can be replayed in the desktop GUI or converted to CSV.
+Compact binary format for efficient storage and replay. 48 bytes per sample (8-byte nanosecond timestamp + 4-byte dataPresent bitmask + 32-byte raw data + 4 bytes padding). Created by `mmcd import --format mmcd`. Can be loaded in the desktop GUI for graph review.
 
 ### PDB (PalmOS import)
-The original MMCd PalmOS app stored logs as `.PDB` database files using the FileStream `DBLK` format. These contain 40-byte `GraphSample` structs (big-endian) with PalmOS epoch timestamps. Use `mmcd import --file log.PDB` to convert.
+The original MMCd PalmOS app stored logs as `.PDB` database files using the FileStream `DBLK` format. These contain 40-byte `GraphSample` structs (big-endian) with PalmOS epoch timestamps. Use `mmcd import --file log.PDB` to convert, or load directly in the desktop GUI.
+
+## Project Structure
+
+```
+mmcd-go/
+├── main.go                     # Entry point: CLI dispatch or Wails GUI launch
+├── app.go                      # Wails bindings (frontend ↔ Go backend)
+├── internal/
+│   ├── version/version.go      # App version, license, attribution constants
+│   ├── sensor/
+│   │   ├── definitions.go      # 22 sensor definitions with addresses and conversions
+│   │   ├── convert.go          # Byte → engineering unit conversion functions
+│   │   └── sample.go           # Sample struct (raw data + timestamp + bitmask)
+│   ├── protocol/
+│   │   ├── serial.go           # Serial port wrapper (1953 baud, 8N1)
+│   │   ├── ecu.go              # ECU request-reply protocol (PollSensors)
+│   │   ├── dtc.go              # DTC decoding and erase commands
+│   │   └── simulator.go        # Fake ECU for demo mode (realistic driving cycles)
+│   ├── logger/
+│   │   ├── logger.go           # Polling loop with SamplePoller interface
+│   │   ├── csv.go              # CSV writer (timestamped, dual-column)
+│   │   ├── csv_reader.go       # CSV reader for log file loading
+│   │   ├── store.go            # Native binary .mmcd format (read/write)
+│   │   └── pdb.go              # PalmOS PDB parser (DBLK/GraphSample)
+│   └── cli/
+│       ├── root.go             # Cobra root command + about subcommand
+│       ├── log.go              # `mmcd log` — live datalogging
+│       ├── dtc.go              # `mmcd dtc` — read/erase DTCs
+│       ├── test.go             # `mmcd test` — actuator tests
+│       ├── review.go           # `mmcd review` — display saved logs
+│       ├── import.go           # `mmcd import` — PDB/format conversion
+│       └── sensors.go          # `mmcd sensors` — list sensor definitions
+├── frontend/
+│   └── src/
+│       ├── App.svelte          # Main app shell, data source selector, shared history
+│       ├── app.css             # Dark theme styles
+│       └── lib/
+│           ├── Dashboard.svelte # Live sensor tile grid
+│           ├── Graph.svelte     # Scrollable graph with crosshair + scrollbar
+│           ├── DTCPanel.svelte  # DTC read/erase UI
+│           ├── TestPanel.svelte # Actuator test UI
+│           ├── Settings.svelte  # Unit system + sensor configuration
+│           └── About.svelte     # Version, license, attribution
+├── Makefile                    # Build targets: build, dev, cli, test, clean
+├── LICENSE                     # GPL-2.0-or-later
+└── README.md
+```
 
 ## Protocol
 
-The MMCD protocol is simple request-reply over serial:
+The MMCD protocol is a simple request-reply over serial:
 
 1. Send 1 byte (sensor address)
 2. Receive 2 bytes (echo of address + data byte)
 3. Apply conversion formula to get engineering units
+
+The ECU uses an **open-collector** data line — both TX and RX share a single wire (ALDL Pin 1). The diode on the cable's TX prevents bus contention.
 
 **Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control.
 
