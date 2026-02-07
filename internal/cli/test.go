@@ -78,10 +78,15 @@ The ECU activates the component for ~6 seconds then responds.`,
 
 		ecu := protocol.NewECU(conn, defs)
 
+		if !confirmPrompt(fmt.Sprintf("Send %s (0x%02X — %s)?", testCommand, ac.addr, ac.desc)) {
+			fmt.Println("Cancelled.")
+			return nil
+		}
+
 		fmt.Printf("Sending: %s (0x%02X) — %s\n", testCommand, ac.addr, ac.desc)
 		fmt.Println("Waiting for ECU response (~6 seconds)...")
 
-		result, err := ecu.SendCommand(ac.addr, 7*time.Second)
+		result, err := ecu.SendCommand(ac.addr, 10*time.Second)
 		if err != nil {
 			return fmt.Errorf("test command failed: %w", err)
 		}

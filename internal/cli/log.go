@@ -101,7 +101,13 @@ Data is written to a CSV file and optionally displayed in the terminal.`,
 
 		// Register callbacks
 		sampleCount := 0
+		errorCount := 0
 		startTime := time.Now()
+
+		lg.OnError(func(err error) {
+			errorCount++
+			slog.Warn("poll error", "error", err, "total_errors", errorCount)
+		})
 
 		lg.OnSample(func(sample sensor.Sample) {
 			sampleCount++
@@ -120,7 +126,7 @@ Data is written to a CSV file and optionally displayed in the terminal.`,
 
 				// Clear screen and print values
 				fmt.Print("\033[H\033[2J")
-				fmt.Printf("MMCD Datalogger — %.1f Hz — %d samples", hz, sampleCount)
+				fmt.Printf("MMCD Datalogger — %.1f Hz — %d samples — %d errors", hz, sampleCount, errorCount)
 				if csvWriter != nil {
 					fmt.Printf(" — logging to %s", logOutput)
 				}

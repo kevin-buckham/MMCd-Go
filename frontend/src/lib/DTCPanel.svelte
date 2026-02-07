@@ -1,5 +1,7 @@
 <script>
   export let connected = false
+  export let monitoring = false
+  export let demoMode = false
 
   let activeDTCs = []
   let storedDTCs = []
@@ -45,10 +47,14 @@
 </script>
 
 <div class="card">
-  <h2>Diagnostic Trouble Codes</h2>
+  <h2>Diagnostic Trouble Codes {#if demoMode}<span style="font-size: 11px; color: var(--accent-yellow);">(DEMO)</span>{/if}</h2>
   {#if !connected}
     <p style="color: var(--text-muted); font-size: 13px;">
       Connect to the ECU to read diagnostic trouble codes.
+    </p>
+  {:else if monitoring}
+    <p style="color: var(--accent-yellow); font-size: 13px;">
+      Pause monitoring before reading or erasing DTCs.
     </p>
   {:else}
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">

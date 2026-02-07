@@ -104,6 +104,6 @@
     <p><strong>Protocol:</strong> Mitsubishi ALDL (OBDI) — request/reply, 1 byte each</p>
     <p><strong>Default baud:</strong> 1953 bps, 8N1, no flow control</p>
     <p><strong>Vehicles:</strong> 1990-1994 Mitsubishi Eclipse, Eagle Talon, Plymouth Laser, Galant (4G63)</p>
-    <p><strong>Hardware:</strong> ALDL diagnostic connector with RS-232 level shifter (MAX232/ST232)</p>
+    <p><strong>Hardware:</strong> ALDL diagnostic connector with USB-TTL adapter (FTDI/CH340) and signal diode</p>
   </div>
 </div>

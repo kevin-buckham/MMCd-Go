@@ -189,8 +189,8 @@ body {
   transition: all 0.15s;
 }
 
-.btn:hover {
-  background: rgba(255,255,255,0.1);
+.btn:hover:not(:disabled) {
+  border-color: var(--text-muted);
 }
 
 .btn-primary {
@@ -213,6 +213,20 @@ body {
   background: #7f1d1d;
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-active,
+.btn-active:disabled {
+  background: var(--accent-green) !important;
+  border-color: var(--accent-green) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.4);
+  opacity: 1 !important;
 }
 
 .btn-sm {

@@ -5,6 +5,7 @@
   import TestPanel from './lib/TestPanel.svelte'
   import Settings from './lib/Settings.svelte'
   import About from './lib/About.svelte'
+  import Log from './lib/Log.svelte'
 
   let currentView = 'dashboard'
   let sensorDefs = []
@@ -18,6 +19,9 @@
   let baudRate = 1953
   let ports = []
   let loadedFileName = ''
+  let actionLoading = false
+  let disconnectReason = ''
+  let commStats = { samplesTotal: 0, errorsTotal: 0, currentHz: 0, uptimeSeconds: 0 }
 
   // Shared state — available to ALL views at ALL times
   let sampleCount = 0
@@ -65,6 +69,9 @@
   }
 
   async function selectLive() {
+    if (actionLoading) return
+    actionLoading = true
+    disconnectReason = ''
     if (dataSource !== 'none') await stopDataSource()
     try {
       await wails?.Connect(selectedPort, baudRate)
@@ -74,9 +81,13 @@
     } catch (e) {
       alert('Connection failed: ' + e)
     }
+    actionLoading = false
   }
 
   async function selectDemo() {
+    if (actionLoading) return
+    actionLoading = true
+    disconnectReason = ''
     if (dataSource !== 'none') await stopDataSource()
     try {
       await wails?.ConnectDemo()
@@ -86,6 +97,7 @@
     } catch (e) {
       alert('Demo mode failed: ' + e)
     }
+    actionLoading = false
   }
 
   async function selectFile() {
@@ -126,6 +138,8 @@
   }
 
   async function stopDataSource() {
+    if (actionLoading) return
+    actionLoading = true
     if (monitoring) {
       try { await wails?.StopMonitoring() } catch (_) {}
       monitoring = false
@@ -140,9 +154,12 @@
     }
     dataSource = 'none'
     loadedFileName = ''
+    actionLoading = false
   }
 
   async function toggleMonitoring() {
+    if (actionLoading) return
+    actionLoading = true
     if (!monitoring) {
       try {
         await wails?.StartMonitoring()
@@ -158,9 +175,12 @@
         console.error('Stop monitoring error:', e)
       }
     }
+    actionLoading = false
   }
 
   async function toggleLogging() {
+    if (actionLoading) return
+    actionLoading = true
     if (!logging) {
       const filename = `mmcd-log-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
       try {
@@ -177,6 +197,7 @@
         console.error('Stop logging error:', e)
       }
     }
+    actionLoading = false
   }
 
   // Record every sample into shared history — runs regardless of active view
@@ -209,12 +230,20 @@
     window.runtime.EventsOn('connection:status', (data) => {
       connected = data.connected
       if (!data.connected) {
+        monitoring = false
+        if (data.reason) {
+          disconnectReason = data.reason
+        }
         if (dataSource === 'live' || dataSource === 'demo') dataSource = 'none'
       }
     })
 
     window.runtime.EventsOn('logging:status', (data) => {
       logging = data.logging
+    })
+
+    window.runtime.EventsOn('comm:stats', (data) => {
+      commStats = data
     })
   }
 
@@ -227,6 +256,7 @@
     { id: 'graph', label: 'Graph', icon: '◈' },
     { id: 'dtc', label: 'DTCs', icon: '⚠' },
     { id: 'test', label: 'Test', icon: '⚡' },
+    { id: 'log', label: 'Log', icon: '☰' },
     { id: 'settings', label: 'Settings', icon: '⚙' },
     { id: 'about', label: 'About', icon: 'ⓘ' },
   ]
@@ -250,22 +280,28 @@
         </select>
         <button class="btn btn-sm" on:click={refreshPorts}>↻</button>
         <input type="number" bind:value={baudRate} placeholder="Baud" style="width: 70px;" />
-        <button class="btn btn-primary btn-sm" on:click={selectLive} disabled={!selectedPort}>
+        {#if baudRate !== 1953}
+          <span style="color: var(--accent-yellow); font-size: 10px;">Non-standard baud</span>
+        {/if}
+        <button class="btn btn-primary btn-sm" on:click={selectLive} disabled={!selectedPort || actionLoading}>
           Live ECU
         </button>
-        <button class="btn btn-sm" style="background: var(--accent-yellow); color: #000; border-color: var(--accent-yellow);" on:click={selectDemo}>
+        <button class="btn btn-sm" style="background: var(--accent-yellow); color: #000; border-color: var(--accent-yellow);" on:click={selectDemo} disabled={actionLoading}>
           Demo
         </button>
-        <button class="btn btn-sm" on:click={selectFile}>
+        <button class="btn btn-sm" on:click={selectFile} disabled={actionLoading}>
           Load File
         </button>
       </div>
+      {#if disconnectReason}
+        <span style="color: var(--accent); font-size: 11px;">{disconnectReason}</span>
+      {/if}
     {:else}
       <span class="source-label" class:demo={dataSource === 'demo'} class:live={dataSource === 'live'} class:file={dataSource === 'file'}>
         {sourceLabel}
       </span>
       <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{sampleCount} samples</span>
-      <button class="btn btn-danger btn-sm" on:click={stopDataSource}>
+      <button class="btn btn-danger btn-sm" on:click={stopDataSource} disabled={actionLoading}>
         ✕ Stop
       </button>
     {/if}
@@ -285,6 +321,9 @@
         >
           <span>{view.icon}</span>
           {view.label}
+          {#if view.id === 'log' && commStats.errorsTotal > 0}
+            <span style="margin-left: auto; background: var(--accent); color: white; font-size: 10px; padding: 1px 5px; border-radius: 8px; font-family: var(--font-mono);">{commStats.errorsTotal}</span>
+          {/if}
         </button>
       {/each}
     </div>
@@ -292,10 +331,10 @@
     <div class="nav-section">
       <h3>Controls</h3>
       {#if dataSource === 'live' || dataSource === 'demo'}
-        <button class="nav-item" on:click={toggleMonitoring}>
+        <button class="nav-item" on:click={toggleMonitoring} disabled={actionLoading}>
           {monitoring ? '⏸ Pause' : '▶ Monitor'}
         </button>
-        <button class="nav-item" on:click={toggleLogging}>
+        <button class="nav-item" on:click={toggleLogging} disabled={actionLoading}>
           {logging ? '⏹ Stop Log' : '⏺ Record'}
         </button>
       {:else if dataSource === 'file'}
@@ -314,8 +353,14 @@
       <div class="nav-item" style="cursor: default; font-family: var(--font-mono); font-size: 11px;">
         {#if dataSource === 'live'}
           <span style="color: var(--accent-green);">● LIVE</span>
+          {#if commStats.currentHz > 0}
+            <span style="color: var(--text-muted); margin-left: 4px;">{commStats.currentHz.toFixed(1)} Hz</span>
+          {/if}
         {:else if dataSource === 'demo'}
           <span style="color: var(--accent-yellow);">● DEMO</span>
+          {#if commStats.currentHz > 0}
+            <span style="color: var(--text-muted); margin-left: 4px;">{commStats.currentHz.toFixed(1)} Hz</span>
+          {/if}
         {:else if dataSource === 'file'}
           <span style="color: var(--accent-blue, #60a5fa);">● FILE</span>
         {:else}
@@ -331,9 +376,11 @@
     {:else if currentView === 'graph'}
       <Graph {sensorDefs} {history} {historyTimes} {historyVersion} isFileMode={dataSource === 'file'} />
     {:else if currentView === 'dtc'}
-      <DTCPanel connected={dataSource === 'live'} />
+      <DTCPanel connected={dataSource === 'live' || dataSource === 'demo'} {monitoring} demoMode={dataSource === 'demo'} />
     {:else if currentView === 'test'}
-      <TestPanel connected={dataSource === 'live'} />
+      <TestPanel connected={dataSource === 'live' || dataSource === 'demo'} {monitoring} demoMode={dataSource === 'demo'} />
+    {:else if currentView === 'log'}
+      <Log />
     {:else if currentView === 'settings'}
       <Settings {sensorDefs} connected={dataSource === 'live' || dataSource === 'demo'} />
     {:else if currentView === 'about'}

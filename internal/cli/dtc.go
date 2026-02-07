@@ -55,6 +55,10 @@ var dtcCmd = &cobra.Command{
 
 		if dtcErase {
 			fmt.Println()
+			if !confirmPrompt("Erase all stored DTCs?") {
+				fmt.Println("Cancelled.")
+				return nil
+			}
 			fmt.Print("Erasing DTCs... ")
 			if err := ecu.EraseDTCs(); err != nil {
 				return fmt.Errorf("failed to erase DTCs: %w", err)

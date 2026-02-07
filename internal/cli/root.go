@@ -1,17 +1,24 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/kbuckham/mmcd/internal/version"
 	"github.com/spf13/cobra"
 )
 
 var (
-	cfgPort  string
-	cfgBaud  int
-	cfgUnits string
+	cfgPort    string
+	cfgBaud    int
+	cfgUnits   string
+	cfgVerbose bool
+	cfgLogFile string
+	cfgYes     bool
 )
 
 // rootCmd is the base command when called without subcommands.
@@ -52,7 +59,45 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPort, "port", "p", "", "Serial port (e.g. /dev/ttyUSB0, COM3)")
 	rootCmd.PersistentFlags().IntVarP(&cfgBaud, "baud", "b", 1953, "Serial baud rate")
 	rootCmd.PersistentFlags().StringVarP(&cfgUnits, "units", "u", "metric", "Unit system: metric, imperial, raw")
+	rootCmd.PersistentFlags().BoolVarP(&cfgVerbose, "verbose", "v", false, "Enable debug logging")
+	rootCmd.PersistentFlags().StringVar(&cfgLogFile, "log-file", "", "Write log output to file")
+	rootCmd.PersistentFlags().BoolVar(&cfgYes, "yes", false, "Skip confirmation prompts")
 	rootCmd.AddCommand(aboutCmd)
+
+	cobra.OnInitialize(initLogging)
+}
+
+func initLogging() {
+	level := slog.LevelInfo
+	if cfgVerbose {
+		level = slog.LevelDebug
+	}
+
+	var w io.Writer = os.Stderr
+	if cfgLogFile != "" {
+		f, err := os.OpenFile(cfgLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not open log file %s: %v\n", cfgLogFile, err)
+		} else {
+			w = io.MultiWriter(os.Stderr, f)
+		}
+	}
+
+	handler := slog.NewTextHandler(w, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(handler))
+}
+
+// confirmPrompt asks the user for y/N confirmation. Returns true if confirmed.
+// If cfgYes is set, returns true without prompting.
+func confirmPrompt(msg string) bool {
+	if cfgYes {
+		return true
+	}
+	fmt.Printf("%s (y/N): ", msg)
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimSpace(strings.ToLower(line))
+	return line == "y" || line == "yes"
 }
 
 // Execute runs the root command.

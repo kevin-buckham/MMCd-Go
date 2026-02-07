@@ -12,13 +12,14 @@ import (
 
 // CSVWriter writes sensor samples to a CSV file.
 type CSVWriter struct {
-	mu      sync.Mutex
-	file    *os.File
-	writer  *csv.Writer
-	defs    []sensor.Definition
-	indices []int
-	units   sensor.UnitSystem
-	count   int
+	mu        sync.Mutex
+	file      *os.File
+	writer    *csv.Writer
+	defs      []sensor.Definition
+	indices   []int
+	units     sensor.UnitSystem
+	count     int
+	startTime time.Time
 }
 
 // NewCSVWriter creates a new CSV writer. It writes the header row immediately.
@@ -53,19 +54,16 @@ func NewCSVWriter(filename string, defs []sensor.Definition, indices []int, unit
 	}, nil
 }
 
-// startTime is set on the first sample written.
-var startTime time.Time
-
 // WriteSample writes a single sensor sample as a CSV row.
 func (cw *CSVWriter) WriteSample(sample sensor.Sample) error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
 
 	if cw.count == 0 {
-		startTime = sample.Time
+		cw.startTime = sample.Time
 	}
 
-	elapsed := sample.Time.Sub(startTime).Milliseconds()
+	elapsed := sample.Time.Sub(cw.startTime).Milliseconds()
 
 	row := []string{
 		sample.Time.Format("2006-01-02T15:04:05.000"),
@@ -90,9 +88,10 @@ func (cw *CSVWriter) WriteSample(sample sensor.Sample) error {
 
 	cw.count++
 
-	// Flush every 10 rows for durability
-	if cw.count%10 == 0 {
-		cw.writer.Flush()
+	// Flush every write for crash safety
+	cw.writer.Flush()
+	if err := cw.writer.Error(); err != nil {
+		return fmt.Errorf("CSV flush error: %w", err)
 	}
 
 	return nil

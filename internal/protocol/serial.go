@@ -66,6 +66,9 @@ func (sc *SerialConn) Open() error {
 	sc.port = port
 	sc.isOpen = true
 	slog.Info("serial port opened", "port", sc.portName, "baud", sc.baudRate)
+	if sc.baudRate != DefaultBaudRate {
+		slog.Warn("non-standard baud rate", "baud", sc.baudRate, "expected", DefaultBaudRate)
+	}
 	return nil
 }
 
@@ -122,6 +125,17 @@ func (sc *SerialConn) PortName() string {
 // BaudRate returns the configured baud rate.
 func (sc *SerialConn) BaudRate() int {
 	return sc.baudRate
+}
+
+// Flush drains any stale bytes from the serial receive buffer.
+func (sc *SerialConn) Flush() error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if !sc.isOpen {
+		return nil
+	}
+	return sc.port.ResetInputBuffer()
 }
 
 // ListPorts returns available serial ports on the system.

@@ -23,10 +23,10 @@ type DTCCode struct {
 
 // DTCResult holds the results of a DTC read operation.
 type DTCResult struct {
-	ActiveRaw  uint16    `json:"activeRaw"`
-	StoredRaw  uint16    `json:"storedRaw"`
-	Active     []DTCCode `json:"active"`
-	Stored     []DTCCode `json:"stored"`
+	ActiveRaw uint16    `json:"activeRaw"`
+	StoredRaw uint16    `json:"storedRaw"`
+	Active    []DTCCode `json:"active"`
+	Stored    []DTCCode `json:"stored"`
 }
 
 // dtcTable maps bit positions to fault codes and descriptions.
@@ -69,6 +69,9 @@ func (e *ECU) ReadDTCs() (*DTCResult, error) {
 		}
 		defer e.conn.Close()
 	}
+
+	// Flush stale bytes before reading DTCs
+	e.conn.Flush()
 
 	result := &DTCResult{}
 
@@ -114,7 +117,7 @@ func (e *ECU) EraseDTCs() error {
 		defer e.conn.Close()
 	}
 
-	result, err := e.SendCommand(AddrEraseDTC, 1*time.Second)
+	result, err := e.SendCommand(AddrEraseDTC, 2*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to erase DTCs: %w", err)
 	}

@@ -30,26 +30,28 @@ type App struct {
 	activeIndices []int
 	connected     bool
 	demoMode      bool
+	commLog       *CommLog
 }
 
 // NewApp creates a new App instance.
 func NewApp() *App {
 	return &App{
-		defs:  sensor.DefaultDefinitions(),
-		units: sensor.UnitMetric,
+		defs:    sensor.DefaultDefinitions(),
+		units:   sensor.UnitMetric,
+		commLog: newCommLog(),
 	}
 }
 
 // startup is called when the app starts. The context is saved for runtime calls.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	slog.Info("MMCD app started")
+	a.log("info", "MMCD app started", "")
 }
 
 // shutdown is called when the app is closing.
 func (a *App) shutdown(ctx context.Context) {
 	a.Disconnect()
-	slog.Info("MMCD app shutdown")
+	a.log("info", "MMCD app shutdown", "")
 }
 
 // --- Methods exposed to the Svelte frontend via Wails bindings ---
@@ -86,7 +88,7 @@ func (a *App) Connect(port string, baud int) error {
 		"baud":      baud,
 	})
 
-	slog.Info("connected to ECU", "port", port, "baud", baud)
+	a.log("info", "Connected to ECU", fmt.Sprintf("port=%s baud=%d", port, baud))
 	return nil
 }
 
@@ -110,7 +112,7 @@ func (a *App) ConnectDemo() error {
 		"demo":      true,
 	})
 
-	slog.Info("connected in DEMO mode (simulated ECU)")
+	a.log("info", "Connected in DEMO mode", "simulated ECU")
 	return nil
 }
 
@@ -237,6 +239,32 @@ func (a *App) StartMonitoring() error {
 	}
 	a.lg = logger.NewWithRate(poller, a.defs, indices, a.units, pollRate)
 
+	a.lg.OnError(func(err error) {
+		a.log("warn", "Poll error", err.Error())
+	})
+
+	a.lg.OnDisconnect(func() {
+		a.log("error", "ECU communication lost", "Too many consecutive errors — check cable")
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "connection:status", map[string]interface{}{
+				"connected": false,
+				"reason":    "ECU communication lost — check cable",
+			})
+		}
+		// Clean up in a goroutine to avoid deadlock (we're called from poll loop)
+		go func() {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			if a.conn != nil {
+				a.conn.Close()
+			}
+			a.connected = false
+			a.ecu = nil
+			a.conn = nil
+			a.lg = nil
+		}()
+	})
+
 	a.lg.OnSample(func(sample sensor.Sample) {
 		// Emit sample to frontend
 		values := sample.ConvertedValues(a.defs, a.units)
@@ -250,7 +278,12 @@ func (a *App) StartMonitoring() error {
 		})
 	})
 
-	return a.lg.Start()
+	err := a.lg.Start()
+	if err == nil {
+		a.log("info", "Monitoring started", fmt.Sprintf("%d sensors", len(indices)))
+		go a.emitStats()
+	}
+	return err
 }
 
 // StopMonitoring stops the polling loop.
@@ -260,6 +293,7 @@ func (a *App) StopMonitoring() {
 
 	if a.lg != nil {
 		a.lg.Stop()
+		a.log("info", "Monitoring stopped", "")
 	}
 }
 
@@ -328,8 +362,44 @@ func (a *App) ReadDTCs() (*protocol.DTCResult, error) {
 	if !a.connected {
 		return nil, fmt.Errorf("not connected")
 	}
+	if a.demoMode {
+		a.log("info", "Reading DTCs (DEMO)", "")
+		result := &protocol.DTCResult{
+			ActiveRaw: 0x0022, // bits 1 + 5
+			StoredRaw: 0x0406, // bits 1, 2, 10
+			Active: []protocol.DTCCode{
+				{Bit: 1, Code: "12", Description: "Intake air flow sensor"},
+				{Bit: 5, Code: "21", Description: "Engine coolant temperature sensor"},
+			},
+			Stored: []protocol.DTCCode{
+				{Bit: 1, Code: "12", Description: "Intake air flow sensor"},
+				{Bit: 2, Code: "13", Description: "Intake air temperature sensor"},
+				{Bit: 10, Code: "31", Description: "Knock sensor"},
+			},
+		}
+		a.log("info", "DTCs read (DEMO)", fmt.Sprintf("active=%d stored=%d", len(result.Active), len(result.Stored)))
+		return result, nil
+	}
 
-	return a.ecu.ReadDTCs()
+	// Pause monitoring if running to avoid serial bus contention
+	wasRunning := a.lg != nil && a.lg.IsRunning()
+	if wasRunning {
+		a.lg.Stop()
+	}
+
+	a.log("info", "Reading DTCs", "")
+	result, err := a.ecu.ReadDTCs()
+
+	if wasRunning {
+		a.lg.Start()
+	}
+
+	if err != nil {
+		a.log("error", "DTC read failed", err.Error())
+	} else {
+		a.log("info", "DTCs read", fmt.Sprintf("active=%d stored=%d", len(result.Active), len(result.Stored)))
+	}
+	return result, err
 }
 
 // EraseDTCs clears stored fault codes.
@@ -340,8 +410,32 @@ func (a *App) EraseDTCs() error {
 	if !a.connected {
 		return fmt.Errorf("not connected")
 	}
+	if a.demoMode {
+		a.log("info", "Erasing DTCs (DEMO)", "")
+		time.Sleep(500 * time.Millisecond)
+		a.log("info", "DTCs erased (DEMO)", "OK")
+		return nil
+	}
 
-	return a.ecu.EraseDTCs()
+	// Pause monitoring if running to avoid serial bus contention
+	wasRunning := a.lg != nil && a.lg.IsRunning()
+	if wasRunning {
+		a.lg.Stop()
+	}
+
+	a.log("info", "Erasing DTCs", "")
+	err := a.ecu.EraseDTCs()
+
+	if wasRunning {
+		a.lg.Start()
+	}
+
+	if err != nil {
+		a.log("error", "DTC erase failed", err.Error())
+	} else {
+		a.log("info", "DTCs erased", "OK")
+	}
+	return err
 }
 
 // RunActuatorTest sends an actuator test command.
@@ -352,7 +446,6 @@ func (a *App) RunActuatorTest(command string) (string, error) {
 	if !a.connected {
 		return "", fmt.Errorf("not connected")
 	}
-
 	commands := map[string]byte{
 		"fuel-pump": 0xF6,
 		"purge":     0xF5,
@@ -373,8 +466,28 @@ func (a *App) RunActuatorTest(command string) (string, error) {
 		return "", fmt.Errorf("unknown command: %s", command)
 	}
 
-	result, err := a.ecu.SendCommand(addr, 7*time.Second)
+	if a.demoMode {
+		a.log("info", "Running actuator test (DEMO)", fmt.Sprintf("%s (0x%02X)", command, addr))
+		time.Sleep(6 * time.Second)
+		a.log("info", "Actuator test complete (DEMO)", fmt.Sprintf("%s → OK", command))
+		return "OK (DEMO)", nil
+	}
+
+	// Pause monitoring if running to avoid serial bus contention
+	wasRunning := a.lg != nil && a.lg.IsRunning()
+	if wasRunning {
+		a.lg.Stop()
+	}
+
+	a.log("info", "Running actuator test", fmt.Sprintf("%s (0x%02X)", command, addr))
+	result, err := a.ecu.SendCommand(addr, 10*time.Second)
+
+	if wasRunning {
+		a.lg.Start()
+	}
+
 	if err != nil {
+		a.log("error", "Actuator test failed", err.Error())
 		return "", err
 	}
 

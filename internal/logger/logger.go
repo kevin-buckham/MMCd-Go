@@ -18,6 +18,20 @@ type SamplePoller interface {
 // SampleCallback is called each time a complete sensor sample is collected.
 type SampleCallback func(sample sensor.Sample)
 
+// ErrorCallback is called when a poll cycle encounters an error.
+type ErrorCallback func(err error)
+
+// DisconnectCallback is called when the watchdog detects persistent failures.
+type DisconnectCallback func()
+
+// LoggerStats holds runtime statistics for the polling loop.
+type LoggerStats struct {
+	SampleCount   uint64  `json:"sampleCount"`
+	ErrorCount    uint64  `json:"errorCount"`
+	CurrentHz     float64 `json:"currentHz"`
+	UptimeSeconds float64 `json:"uptimeSeconds"`
+}
+
 // Logger manages the ECU polling loop and data collection.
 type Logger struct {
 	poller    SamplePoller
@@ -25,12 +39,18 @@ type Logger struct {
 	indices   []int // sensor indices to poll
 	units     sensor.UnitSystem
 	callbacks []SampleCallback
+	errCbs    []ErrorCallback
+	disconnCb DisconnectCallback
 	pollRate  time.Duration // interval between polls
 
-	mu         sync.Mutex
-	running    bool
-	cancel     context.CancelFunc
-	lastSample sensor.Sample
+	mu              sync.Mutex
+	running         bool
+	cancel          context.CancelFunc
+	lastSample      sensor.Sample
+	sampleCount     uint64
+	errorCount      uint64
+	consecutiveErrs uint32
+	startTime       time.Time
 }
 
 // New creates a new Logger with a real ECU or simulator as the poller.
@@ -56,6 +76,39 @@ func (l *Logger) OnSample(cb SampleCallback) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.callbacks = append(l.callbacks, cb)
+}
+
+// OnError registers a callback that fires on each poll error.
+func (l *Logger) OnError(cb ErrorCallback) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.errCbs = append(l.errCbs, cb)
+}
+
+// OnDisconnect registers a callback for when the watchdog detects persistent failures.
+func (l *Logger) OnDisconnect(cb DisconnectCallback) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.disconnCb = cb
+}
+
+// Stats returns current polling statistics.
+func (l *Logger) Stats() LoggerStats {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var hz float64
+	if !l.startTime.IsZero() {
+		elapsed := time.Since(l.startTime).Seconds()
+		if elapsed > 0 {
+			hz = float64(l.sampleCount) / elapsed
+		}
+	}
+	return LoggerStats{
+		SampleCount:   l.sampleCount,
+		ErrorCount:    l.errorCount,
+		CurrentHz:     hz,
+		UptimeSeconds: time.Since(l.startTime).Seconds(),
+	}
 }
 
 // Start begins the polling loop in a goroutine.
@@ -111,13 +164,19 @@ func (l *Logger) SetIndices(indices []int) {
 	l.indices = indices
 }
 
+const watchdogThreshold = 20 // consecutive errors before declaring disconnect
+
 // pollLoop continuously queries the ECU for sensor data.
 func (l *Logger) pollLoop(ctx context.Context) {
 	ticker := time.NewTicker(l.pollRate)
 	defer ticker.Stop()
 
-	cycleCount := uint64(0)
-	startTime := time.Now()
+	l.mu.Lock()
+	l.startTime = time.Now()
+	l.sampleCount = 0
+	l.errorCount = 0
+	l.consecutiveErrs = 0
+	l.mu.Unlock()
 
 	for {
 		select {
@@ -136,17 +195,35 @@ func (l *Logger) pollLoop(ctx context.Context) {
 
 			sample, err := l.poller.PollSensors(indices)
 			if err != nil {
-				slog.Debug("poll error", "error", err)
+				l.mu.Lock()
+				l.errorCount++
+				l.consecutiveErrs++
+				consecErrs := l.consecutiveErrs
+				errCbs := make([]ErrorCallback, len(l.errCbs))
+				copy(errCbs, l.errCbs)
+				disconnCb := l.disconnCb
+				l.mu.Unlock()
+
+				slog.Debug("poll error", "error", err, "consecutive", consecErrs)
+
+				for _, cb := range errCbs {
+					cb(err)
+				}
+
+				// Watchdog: if too many consecutive errors, assume disconnect
+				if consecErrs >= watchdogThreshold {
+					slog.Warn("watchdog: too many consecutive errors, assuming ECU disconnect", "count", consecErrs)
+					if disconnCb != nil {
+						disconnCb()
+					}
+					return
+				}
 				continue
 			}
 
-			cycleCount++
-			elapsed := time.Since(startTime).Seconds()
-			if elapsed > 0 && cycleCount%10 == 0 {
-				slog.Debug("sample rate", "hz", float64(cycleCount)/elapsed)
-			}
-
 			l.mu.Lock()
+			l.sampleCount++
+			l.consecutiveErrs = 0
 			l.lastSample = sample
 			callbacks := make([]SampleCallback, len(l.callbacks))
 			copy(callbacks, l.callbacks)
