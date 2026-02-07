@@ -10,3 +10,14 @@ const (
 	Attribution = "Inspired by and thanks to the original MMCd PalmOS datalogger by Dmitry Yurtaev"
 	URL         = "https://github.com/kbuckham/mmcd"
 )
+
+// Injected at build time via -ldflags
+var (
+	GitHash   = "dev"
+	BuildTime = "unknown"
+)
+
+// FullVersion returns version string with git hash and build time.
+func FullVersion() string {
+	return Version + " (" + GitHash + ") built " + BuildTime
+}
