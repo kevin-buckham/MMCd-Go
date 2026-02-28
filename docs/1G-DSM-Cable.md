@@ -77,9 +77,13 @@ GND (Black) ───────────────┼──────�
 - Must be connected to Pin 12 (Ground) to put the ECU in diagnostic mode
 - Without this jumper, the ECU will not respond to data requests
 
-## FTDI EEPROM Configuration
+## FTDI EEPROM Configuration (TTL Cables Only)
 
-The FTDI chip's EEPROM must be flashed with signal inversion enabled for both TX and RX. The 1G DSM ECU uses inverted signaling compared to standard UART.
+**This section only applies to TTL-level FTDI cables** (e.g., TTL-232R-5V, generic USB-to-TTL adapters). TTL cables output standard logic levels (0V/5V) where the idle state is HIGH — the opposite of what the ALDL bus expects.
+
+**RS-232 level cables do NOT need EEPROM modification.** RS-232 signals are already inverted relative to TTL (idle is negative voltage), which matches the ALDL bus signaling.
+
+If using a TTL cable, the FTDI chip's EEPROM must be flashed with signal inversion enabled for both TX and RX to match the ALDL bus.
 
 ### Linux (ftdi_eeprom)
 
