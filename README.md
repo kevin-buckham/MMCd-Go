@@ -188,16 +188,16 @@ This "universal" cable design works with MMCd, TunerPro, and EvoScan. The data l
 FTDI/USB-TTL Adapter                           ALDL Connector
 ─────────────────                              ──────────────
 
-RX  (Yellow/White) ─────────────────────────── Car Pin 1 (Data)
-
-                        1N4148 Diode
-TX  (Green) ────────────┤►├────────────────── Car Pin 1 (Data)
-                   (cathode→FTDI)
-                   (anode→car)
-
-GND (Black) ────────────────────────────────── Car Pin 12 (Ground)
-
-                    Car Pin 10 ──── Car Pin 12 (jumper to enable diag mode)
+RX  (Yellow/White) ──────────────────┬──────── Car Pin 1 (Data)
+                                     │
+                        1N4148 Diode │
+TX  (Green) ────────────┤►├──────────┴─┬────── Car Pin 1 (Data)
+                   (cathode→FTDI)      │
+                   (anode→car)         R =10kΩ
+                                       │
+GND (Black) ───────────────────────────┴─┬─── Car Pin 12 (Ground)
+                                         │
+                                         └──── Car Pin 10 (jumper to enable diag mode)
 ```
 
 | FTDI Pin | Wire Color | Connects To | Notes |
