@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"go.bug.st/serial"
 )
@@ -58,7 +59,7 @@ func (sc *SerialConn) Open() error {
 	}
 
 	// Set read timeout to 500ms (matching original code's half-second timeout)
-	if err := port.SetReadTimeout(500); err != nil {
+	if err := port.SetReadTimeout(500 * time.Millisecond); err != nil {
 		port.Close()
 		return fmt.Errorf("failed to set read timeout: %w", err)
 	}
