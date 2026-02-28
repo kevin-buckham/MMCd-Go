@@ -58,7 +58,7 @@ var aboutCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPort, "port", "p", "", "Serial port (e.g. /dev/ttyUSB0, COM3)")
-	rootCmd.PersistentFlags().IntVarP(&cfgBaud, "baud", "b", 1953, "Serial baud rate")
+	rootCmd.PersistentFlags().IntVarP(&cfgBaud, "baud", "b", 1920, "Serial baud rate")
 	rootCmd.PersistentFlags().StringVarP(&cfgUnits, "units", "u", "metric", "Unit system: metric, imperial, raw")
 	rootCmd.PersistentFlags().BoolVarP(&cfgVerbose, "verbose", "v", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringVar(&cfgLogFile, "log-file", "", "Write log output to file")

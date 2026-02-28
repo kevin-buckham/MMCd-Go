@@ -145,9 +145,9 @@ func (e *ECU) SendCommand(cmd byte, timeout time.Duration) (byte, error) {
 		return 0, fmt.Errorf("failed to send command 0x%02X: %w", cmd, err)
 	}
 
-	// Read echo with short timeout
+	// Read echo with short timeout (100ms matches original PalmOS code)
 	buf := make([]byte, 1)
-	echoDeadline := time.Now().Add(500 * time.Millisecond)
+	echoDeadline := time.Now().Add(100 * time.Millisecond)
 	echoRead := 0
 	for echoRead < 1 && time.Now().Before(echoDeadline) {
 		n, err := e.conn.Receive(buf)

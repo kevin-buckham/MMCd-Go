@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	// DefaultBaudRate is the MMCD protocol baud rate (spec says 1953, original code uses 1920).
-	DefaultBaudRate = 1953
+	// DefaultBaudRate matches the original PalmOS MMCD code (1920 baud).
+	DefaultBaudRate = 1920
 
 	// DefaultDataBits for MMCD protocol.
 	DefaultDataBits = 8
