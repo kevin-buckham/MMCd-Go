@@ -157,15 +157,27 @@ You need a **USB-to-TTL serial adapter** (FTDI FT232, CH340, CP2102, etc.) and a
 
 ### ALDL Connector Pinout
 
+This is for the cable:
 ```
-  ┌─────────────────────────────┐
-  │  1  2  3  4  5  6  7  8    │  ALDL 12-pin connector
-  │  9  10 11 12               │  (under dash, driver side)
-  └─────────────────────────────┘
-   │      │      │
-   │      │      └── Pin 12: Ground
-   │      └── Pin 10: Diagnostic enable (short to ground)
-   └── Pin 1: Serial data (bidirectional)
+     ┌── Pin 1: Serial data (bidirectional)
+     │
+  ┌────────────────────────┐
+  │  1  2  3         4  5  │  ALDL 12-pin connector
+  │  6  7  8  9  10 11 12  │  (under dash, driver side)
+  └────────────────────────┘
+                 │      │
+                 │      └── Pin 12: Ground
+                 └── Pin 10: Diagnostic enable (short to ground)
+```
+
+The port on the car looks like this:
+
+```
+  ┌────────────────────────┐
+  │  5  4  3         2  1  │  ALDL 12-pin connector
+  │  12 11 10  9  8  7  6  │  (under dash, driver side)
+  └────────────────────────┘
+
 ```
 
 ### Cable Schematic
