@@ -15,12 +15,25 @@ Build guide for a USB datalogging cable for 1G DSM vehicles (1990-1994 Mitsubish
 
 The ALDL connector is located under the dash, driver side.
 
+Cable side (what you wire to):
 ```
-  ___________________________
- /  F  E  D  C  B  A         \
-|  12  11  10  9  8  7         |
-|   6   5   4   3   2   1     |
- \___________________________ /
+     ┌── Pin 1: Serial data (bidirectional)
+     │
+  ┌────────────────────────┐
+  │  1  2  3         4  5  │  ALDL 12-pin connector
+  │  6  7  8  9  10 11 12  │  (under dash, driver side)
+  └────────────────────────┘
+                 │      │
+                 │      └── Pin 12: Ground
+                 └── Pin 10: Diagnostic enable (short to ground)
+```
+
+Car side (what you see looking at the port):
+```
+  ┌────────────────────────┐
+  │  5  4  3         2  1  │  ALDL 12-pin connector
+  │  12 11 10  9  8  7  6  │  (under dash, driver side)
+  └────────────────────────┘
 ```
 
 Pins used for datalogging:

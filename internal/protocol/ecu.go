@@ -32,6 +32,22 @@ func NewECU(conn *SerialConn, defs []sensor.Definition) *ECU {
 	}
 }
 
+// Probe sends a single sensor query to verify the ECU is responding.
+// It flushes the receive buffer first to clear any stale data, then queries
+// the RPM sensor (0x21). Returns nil on success or an error describing
+// exactly what went wrong (timeout, echo mismatch, etc.).
+func (e *ECU) Probe() error {
+	e.conn.Flush()
+
+	const probeAddr byte = 0x21 // RPM — always available with key ON
+	data, err := e.QuerySensor(probeAddr)
+	if err != nil {
+		return fmt.Errorf("ECU probe failed (addr 0x%02X): %w", probeAddr, err)
+	}
+	slog.Info("ECU probe OK", "addr", fmt.Sprintf("0x%02X", probeAddr), "data", fmt.Sprintf("0x%02X", data))
+	return nil
+}
+
 // QuerySensor sends a sensor address to the ECU and reads the response.
 // The ECU echoes the address byte back, followed by the data byte.
 // Returns the raw data byte.

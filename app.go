@@ -84,6 +84,14 @@ func (a *App) Connect(port string, baud int) error {
 	a.ecu = protocol.NewECU(a.conn, a.defs)
 	a.connected = true
 
+	// Probe the ECU to verify communication before declaring success
+	a.log("info", "Probing ECU", fmt.Sprintf("port=%s baud=%d", port, baud))
+	if err := a.ecu.Probe(); err != nil {
+		a.log("warn", "ECU probe failed", err.Error())
+	} else {
+		a.log("info", "ECU probe OK", "ECU is responding")
+	}
+
 	runtime.EventsEmit(a.ctx, "connection:status", map[string]interface{}{
 		"connected": true,
 		"port":      port,

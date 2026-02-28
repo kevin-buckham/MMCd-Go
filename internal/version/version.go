@@ -1,7 +1,7 @@
 package version
 
 const (
-	Version     = "0.4.3"
+	Version     = "0.4.4"
 	Name        = "MMCD Datalogger"
 	Description = "Cross-platform ECU datalogging and diagnostics tool for 1G DSM (1990-1994 Mitsubishi Eclipse, Eagle Talon, Plymouth Laser)"
 	Copyright   = "© 2026 Kevin Buckham & Claude (Anthropic)"
