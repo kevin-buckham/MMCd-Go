@@ -16,7 +16,7 @@
   let monitoring = false
   let logging = false
   let selectedPort = ''
-  let baudRate = 1953
+  let baudRate = 1920
   let ports = []
   let loadedFileName = ''
   let selectedSensors = []
