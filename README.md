@@ -8,7 +8,7 @@ Cross-platform diagnostic and datalogging tool for pre-OBDII (1990–1994) Mitsu
 
 A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **headless CLI**.
 
-> **⚠️ Pre-release (v0.3.x)** — This version has not yet been tested on a live vehicle. It includes a built-in demo simulator and can load recorded logs (including classic PalmOS MMCd `.pdb` files) for full UI and workflow testing. Once validated on-vehicle, it will be promoted to **v1.0.0**.
+> **⚠️ Pre-release (v0.7.0)** — Live vehicle connectivity confirmed at 1920 bps. Includes a built-in demo simulator and can load recorded logs (including classic PalmOS MMCd `.pdb` files) for full UI and workflow testing.
 
 ## Features
 
@@ -23,7 +23,10 @@ A modern Go rewrite with both a **desktop GUI** (Wails v2 + Svelte) and a **head
 - **Log file viewer** — Load and review CSV, .mmcd, or PalmOS PDB files directly in the graph
 - **DTC read/erase** — Read active and stored diagnostic trouble codes
 - **Actuator tests** — Fuel pump, purge solenoid, EGR, injector disable
-- **CSV recording** — Record live data to timestamped CSV while monitoring
+- **CSV recording** — Record live data to timestamped CSV (`~/mmcd-logs/`) while monitoring
+- **Smart port filtering** — Hides system ports (Bluetooth, debug) and `/dev/tty.*` duplicates on macOS; "Show all" toggle for override
+- **Persistent settings** — Sensor selection, baud rate, and last port saved to `~/.config/mmcd/config.json`
+- **Auto-start monitoring** — Dashboard begins updating immediately after connecting
 - **Demo mode** — Built-in ECU simulator with realistic driving scenarios (idle → accel → cruise → decel) for UI testing without hardware
 
 ### Headless CLI

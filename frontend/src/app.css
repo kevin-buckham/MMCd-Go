@@ -104,7 +104,12 @@ body {
   text-align: left;
 }
 
-.nav-item:hover {
+.nav-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nav-item:hover:not(:disabled) {
   background: rgba(255,255,255,0.05);
   color: var(--text-primary);
 }
@@ -259,7 +264,7 @@ body {
 }
 
 .connection-bar select,
-.connection-bar input {
+.connection-bar input:not([type="checkbox"]) {
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -272,7 +277,7 @@ body {
   min-width: 160px;
 }
 
-.connection-bar input {
+.connection-bar input:not([type="checkbox"]) {
   width: 80px;
 }
 

@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -58,9 +60,24 @@ func (a *App) shutdown(ctx context.Context) {
 
 // --- Methods exposed to the Svelte frontend via Wails bindings ---
 
-// ListSerialPorts returns available serial ports on the system.
+// LoadUserConfig loads persisted user preferences from disk.
+func (a *App) LoadUserConfig() (UserConfig, error) {
+	return LoadConfig()
+}
+
+// SaveUserConfig persists user preferences to disk.
+func (a *App) SaveUserConfig(cfg UserConfig) error {
+	return SaveConfig(cfg)
+}
+
+// ListSerialPorts returns available serial ports, filtered for relevance.
 func (a *App) ListSerialPorts() ([]string, error) {
 	return protocol.ListPorts()
+}
+
+// ListAllSerialPorts returns all serial ports without filtering.
+func (a *App) ListAllSerialPorts() ([]string, error) {
+	return protocol.ListAllPorts()
 }
 
 // Connect opens a serial connection to the ECU.
@@ -316,6 +333,19 @@ func (a *App) StartLogging(filename string) error {
 		return fmt.Errorf("already logging")
 	}
 
+	// Resolve to absolute path in user's home directory if relative
+	if !filepath.IsAbs(filename) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("cannot determine home directory: %w", err)
+		}
+		logDir := filepath.Join(home, "mmcd-logs")
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return fmt.Errorf("cannot create log directory: %w", err)
+		}
+		filename = filepath.Join(logDir, filename)
+	}
+
 	indices := a.activeIndices
 	if len(indices) == 0 {
 		indices = sensor.AllPollableIndices(a.defs)
@@ -334,6 +364,8 @@ func (a *App) StartLogging(filename string) error {
 			}
 		})
 	}
+
+	a.log("info", "Logging started", filename)
 
 	runtime.EventsEmit(a.ctx, "logging:status", map[string]interface{}{
 		"logging":  true,

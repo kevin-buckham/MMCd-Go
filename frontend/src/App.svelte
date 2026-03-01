@@ -18,10 +18,12 @@
   let selectedPort = ''
   let baudRate = 1920
   let ports = []
+  let showAllPorts = false
   let loadedFileName = ''
   let selectedSensors = []
   let logFileName = ''
   let actionLoading = false
+  let configLoaded = false
   let disconnectReason = ''
   let commStats = { samplesTotal: 0, errorsTotal: 0, currentHz: 0, uptimeSeconds: 0 }
 
@@ -43,7 +45,9 @@
 
   async function refreshPorts() {
     try {
-      ports = await wails?.ListSerialPorts() || []
+      ports = showAllPorts
+        ? await wails?.ListAllSerialPorts() || []
+        : await wails?.ListSerialPorts() || []
       if (ports.length > 0 && !selectedPort) selectedPort = ports[0]
     } catch (e) {
       console.error('Failed to list ports:', e)
@@ -53,10 +57,31 @@
   async function loadSensorDefs() {
     try {
       sensorDefs = await wails?.GetSensorDefinitions() || []
-      // Default to all pollable sensors
-      selectedSensors = sensorDefs.filter(d => d.exists && !d.computed).map(d => d.slug)
+      // Load saved config, fall back to all pollable sensors
+      const cfg = await wails?.LoadUserConfig() || {}
+      if (cfg.selectedSensors && cfg.selectedSensors.length > 0) {
+        selectedSensors = cfg.selectedSensors
+      } else {
+        selectedSensors = sensorDefs.filter(d => d.exists && !d.computed).map(d => d.slug)
+      }
+      if (cfg.baudRate > 0) baudRate = cfg.baudRate
+      if (cfg.lastPort) selectedPort = cfg.lastPort
+      configLoaded = true
     } catch (e) {
       console.error('Failed to load sensor defs:', e)
+      configLoaded = true
+    }
+  }
+
+  async function saveConfig() {
+    try {
+      await wails?.SaveUserConfig({
+        selectedSensors,
+        baudRate,
+        lastPort: selectedPort,
+      })
+    } catch (e) {
+      console.error('Failed to save config:', e)
     }
   }
 
@@ -273,6 +298,11 @@
     { id: 'about', label: 'About', icon: 'ⓘ' },
   ]
 
+  // Auto-save config when user changes sensor selection, baud, or port
+  $: if (configLoaded && selectedSensors) {
+    saveConfig()
+  }
+
   $: sourceLabel = dataSource === 'live' ? `Live: ${selectedPort}`
                   : dataSource === 'demo' ? 'Demo Simulator'
                   : dataSource === 'file' ? `File: ${loadedFileName.split('/').pop()}`
@@ -291,8 +321,12 @@
           {/each}
         </select>
         <button class="btn btn-sm" on:click={refreshPorts}>↻</button>
+        <label style="font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; cursor: pointer;">
+          <input type="checkbox" bind:checked={showAllPorts} on:change={refreshPorts} style="margin: 0;" />
+          All
+        </label>
         <input type="number" bind:value={baudRate} placeholder="Baud" style="width: 70px;" />
-        {#if baudRate !== 1953}
+        {#if baudRate !== 1920 && baudRate !== 1953}
           <span style="color: var(--accent-yellow); font-size: 10px;">Non-standard baud</span>
         {/if}
         <button class="btn btn-primary btn-sm" on:click={selectLive} disabled={!selectedPort || actionLoading}>

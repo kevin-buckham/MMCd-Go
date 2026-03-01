@@ -258,6 +258,7 @@ go vet ./...
 | `internal/sensor/definitions.go` | Sensor table — 22 sensors with addresses, slugs, conversion functions |
 | `internal/logger/logger.go` | Poll loop — watchdog, callbacks, stats, goroutine lifecycle |
 | `app.go` | Wails bindings — state machine, frontend events, all user-facing methods |
+| `config.go` | Persistent user config — sensor selection, baud rate, last port (`~/.config/mmcd/config.json`) |
 
 ### Testing
 

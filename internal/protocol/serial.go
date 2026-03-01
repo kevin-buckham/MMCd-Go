@@ -3,6 +3,9 @@ package protocol
 import (
 	"fmt"
 	"log/slog"
+	goruntime "runtime"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -139,11 +142,95 @@ func (sc *SerialConn) Flush() error {
 	return sc.port.ResetInputBuffer()
 }
 
-// ListPorts returns available serial ports on the system.
+// ListPorts returns available serial ports on the system, filtered for relevance.
+// On macOS: only /dev/cu.* ports (not /dev/tty.* which block on carrier detect),
+// excluding Bluetooth, debug-console, and wlan-debug system ports.
+// On Linux: excludes built-in /dev/ttyS* ports (motherboard UARTs).
+// On Windows: no filtering (COM ports are already clean).
+// USB-serial adapters are sorted to the top of the list.
 func ListPorts() ([]string, error) {
 	ports, err := serial.GetPortsList()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list serial ports: %w", err)
 	}
+	return filterPorts(ports), nil
+}
+
+// ListAllPorts returns all serial ports without platform filtering,
+// but still sorted with USB-serial adapters first.
+func ListAllPorts() ([]string, error) {
+	ports, err := serial.GetPortsList()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list serial ports: %w", err)
+	}
+	sort.Slice(ports, func(i, j int) bool {
+		iUSB := isUSBSerial(ports[i])
+		jUSB := isUSBSerial(ports[j])
+		if iUSB != jUSB {
+			return iUSB
+		}
+		return ports[i] < ports[j]
+	})
 	return ports, nil
+}
+
+// macOS system ports that are never USB-serial adapters.
+var macSystemPorts = []string{
+	"Bluetooth-Incoming-Port",
+	"debug-console",
+	"wlan-debug",
+}
+
+// filterPorts removes irrelevant ports and sorts USB-serial adapters first.
+func filterPorts(ports []string) []string {
+	var filtered []string
+	for _, p := range ports {
+		if goruntime.GOOS == "darwin" {
+			// Skip /dev/tty.* — use /dev/cu.* (callout) instead.
+			// tty.* blocks on open() waiting for carrier detect.
+			if strings.HasPrefix(p, "/dev/tty.") {
+				continue
+			}
+			// Skip known macOS system ports
+			skip := false
+			for _, sys := range macSystemPorts {
+				if strings.Contains(p, sys) {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+		} else if goruntime.GOOS == "linux" {
+			// Skip built-in motherboard UARTs (ttyS0, ttyS1, etc.)
+			if strings.HasPrefix(p, "/dev/ttyS") {
+				continue
+			}
+		}
+		filtered = append(filtered, p)
+	}
+
+	// Sort USB-serial adapters to the top
+	sort.Slice(filtered, func(i, j int) bool {
+		iUSB := isUSBSerial(filtered[i])
+		jUSB := isUSBSerial(filtered[j])
+		if iUSB != jUSB {
+			return iUSB
+		}
+		return filtered[i] < filtered[j]
+	})
+
+	return filtered
+}
+
+// isUSBSerial returns true if the port looks like a USB-serial adapter.
+func isUSBSerial(port string) bool {
+	p := strings.ToLower(port)
+	return strings.Contains(p, "usbserial") ||
+		strings.Contains(p, "usbmodem") ||
+		strings.Contains(p, "wchusbserial") ||
+		strings.Contains(p, "slab_usbtouart") ||
+		strings.Contains(p, "ttyusb") ||
+		strings.Contains(p, "ttyacm")
 }
