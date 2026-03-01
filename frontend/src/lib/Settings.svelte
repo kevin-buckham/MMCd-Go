@@ -1,9 +1,9 @@
 <script>
   export let sensorDefs = []
   export let connected = false
+  export let selectedSensors = []
 
   let units = 'metric'
-  let selectedSensors = ['RPM', 'TPS', 'COOL', 'TIMA', 'KNCK', 'INJP', 'O2-R', 'BATT']
 
   const wails = window.go?.main?.App
 

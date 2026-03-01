@@ -216,7 +216,7 @@ The diode on TX ensures the adapter only drives the line low and doesn't hold it
 
 **Orientation:** Stripe (cathode) → towards FTDI adapter. Non-stripe (anode) → towards car.
 
-**Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control.
+**Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control. 1920 baud also works and is a standard FTDI-supported rate.
 
 ## CLI Usage
 
@@ -359,7 +359,7 @@ The MMCD protocol is a simple request-reply over serial:
 
 The ECU uses an **open-collector** data line — both TX and RX share a single wire (ALDL Pin 1). The diode on the cable's TX prevents bus contention.
 
-**Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control.
+**Serial settings:** 1953 baud, 8 data bits, 1 stop bit, no parity, no flow control. 1920 baud also works and is a standard FTDI-supported rate.
 
 ## License
 

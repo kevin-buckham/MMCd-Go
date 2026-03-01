@@ -19,6 +19,8 @@
   let baudRate = 1953
   let ports = []
   let loadedFileName = ''
+  let selectedSensors = []
+  let logFileName = ''
   let actionLoading = false
   let disconnectReason = ''
   let commStats = { samplesTotal: 0, errorsTotal: 0, currentHz: 0, uptimeSeconds: 0 }
@@ -51,6 +53,8 @@
   async function loadSensorDefs() {
     try {
       sensorDefs = await wails?.GetSensorDefinitions() || []
+      // Default to all pollable sensors
+      selectedSensors = sensorDefs.filter(d => d.exists && !d.computed).map(d => d.slug)
     } catch (e) {
       console.error('Failed to load sensor defs:', e)
     }
@@ -78,6 +82,9 @@
       dataSource = 'live'
       connected = true
       clearHistory()
+      await wails?.SetActiveSensors(selectedSensors)
+      await wails?.StartMonitoring()
+      monitoring = true
     } catch (e) {
       alert('Connection failed: ' + e)
     }
@@ -94,6 +101,9 @@
       dataSource = 'demo'
       connected = true
       clearHistory()
+      await wails?.SetActiveSensors(selectedSensors)
+      await wails?.StartMonitoring()
+      monitoring = true
     } catch (e) {
       alert('Demo mode failed: ' + e)
     }
@@ -186,6 +196,7 @@
       try {
         await wails?.StartLogging(filename)
         logging = true
+        logFileName = filename
       } catch (e) {
         alert('Failed to start logging: ' + e)
       }
@@ -193,6 +204,7 @@
       try {
         await wails?.StopLogging()
         logging = false
+        logFileName = ''
       } catch (e) {
         console.error('Stop logging error:', e)
       }
@@ -367,6 +379,11 @@
           <span style="color: var(--text-muted);">○ IDLE</span>
         {/if}
       </div>
+      {#if logging}
+        <div class="nav-item" style="cursor: default; font-size: 10px; color: var(--accent); padding: 2px 12px;">
+          ⏺ REC → {logFileName}
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -382,7 +399,7 @@
     {:else if currentView === 'log'}
       <Log />
     {:else if currentView === 'settings'}
-      <Settings {sensorDefs} connected={dataSource === 'live' || dataSource === 'demo'} />
+      <Settings {sensorDefs} connected={dataSource === 'live' || dataSource === 'demo'} bind:selectedSensors />
     {:else if currentView === 'about'}
       <About />
     {/if}
